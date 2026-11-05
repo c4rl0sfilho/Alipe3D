@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+
+/*
+ * Tokens da identidade visual Alipe3D.
+ * Use as classes geradas (bg-brand-500, text-ink, border-line, ...) — nunca cores soltas no código.
+ */
+@theme {
+  --color-brand-50: #fbf0f3;
+  --color-brand-100: #f7dce3; /* Rosa claro */
+  --color-brand-300: #eba5b4; /* Rosa de destaque */
+  --color-brand-500: #d96a83; /* Rosa principal */
+  --color-brand-700: #ad405f; /* Rosa escuro */
+
+  --color-canvas: #f8f8fa; /* Fundo principal */
+  --color-surface: #ffffff; /* Superfícies */
+  --color-ink: #29252a; /* Texto principal */
+  --color-ink-muted: #77717a; /* Texto secundário */
+  --color-line: #ebe7ea; /* Bordas */
+
+  --color-success: #279b68;
+  --color-success-soft: #e6f4ee;
+  --color-warning: #d99a35;
+  --color-warning-soft: #fbf2e3;
+  --color-danger: #d9535d;
+  --color-danger-soft: #fbe9ea;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius-card: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(41 37 42 / 0.04), 0 1px 3px rgb(41 37 42 / 0.06);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}

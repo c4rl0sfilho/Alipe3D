@@ -1,0 +1,84 @@
+name: alipe3d-manager
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: alipe3d-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-alipe3d}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:-alipe3d_manager}
+      TZ: America/Sao_Paulo
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      # PostgreSQL 18+ usa /var/lib/postgresql como raiz dos dados
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---- Aplicação completa em containers (opcional): docker compose --profile app up -d ----
+  backend:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: alipe3d-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_PORT: 3333
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alipe3d}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alipe3d_manager}?schema=public
+      CORS_ORIGINS: http://localhost:8080
+      APP_URL: http://localhost:8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-300}
+      # Documentação desligada na imagem de produção
+      SWAGGER_ENABLED: 'false'
+      TRUST_PROXY: 'true'
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Defina JWT_ACCESS_SECRET no arquivo .env}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-900}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-7}
+      # Em produção real, sirva por HTTPS e use COOKIE_SECURE=true
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-10}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Administrador}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      UPLOAD_DIR: /app/apps/backend/uploads
+    volumes:
+      # Fotos, STL, 3MF e documentos dos produtos (persistem entre atualizações)
+      - uploads:/app/apps/backend/uploads
+    expose:
+      - '3333'
+
+  frontend:
+    profiles: ['app']
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: alipe3d-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '127.0.0.1:8080:80'
+
+volumes:
+  postgres-data:
+  uploads:

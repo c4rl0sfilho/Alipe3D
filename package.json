@@ -1,0 +1,52 @@
+{
+  "name": "alipe3d-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Alipe3D Manager — gestão operacional, comercial e financeira para produção 3D.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @alipe3d/shared && concurrently -k -n shared,api,web -c magenta,cyan,green \"npm run dev -w @alipe3d/shared\" \"npm run dev -w @alipe3d/backend\" \"npm run dev -w @alipe3d/frontend\"",
+    "build": "npm run build -w @alipe3d/shared && npm run build -w @alipe3d/backend && npm run build -w @alipe3d/frontend",
+    "typecheck": "npm run build -w @alipe3d/shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build -w @alipe3d/shared && npm run test --workspaces --if-present",
+    "test:int": "npm run build -w @alipe3d/shared && npm run test:int -w @alipe3d/backend",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:generate": "npm run prisma:generate -w @alipe3d/backend",
+    "db:migrate": "npm run prisma:migrate -w @alipe3d/backend",
+    "db:seed": "npm run db:seed -w @alipe3d/backend",
+    "db:studio": "npm run prisma:studio -w @alipe3d/backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "concurrently": "10.0.6",
+    "eslint": "10.14.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "globals": "17.14.0",
+    "jiti": "2.7.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  },
+  "allowScripts": {
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true,
+    "esbuild@0.28.2": true,
+    "bcrypt@6.0.0": true,
+    "@scarf/scarf": false
+  }
+}
