@@ -1,6 +1,6 @@
 # Alipe3D Manager — Planejamento técnico
 
-> Documento vivo. Atualizado a cada fase. Versão: **Fase 3 — Produtos e estoque**.
+> Documento vivo. Atualizado a cada fase. Versão: **Fase 4 — Impressoras e produção**.
 
 ## 1. Arquitetura
 
@@ -117,8 +117,8 @@ erDiagram
 
   Order ||--o{ ProductionOrder : "origina"
   Printer ||--o{ ProductionOrder : "planejada em"
-  ProductionOrder ||--|{ ProductionOrderItem : "itens"
-  ProductVariant ||--o{ ProductionOrderItem : ""
+  ProductVariant ||--o{ ProductionOrder : "produz"
+  Material ||--o{ ProductionOrder : "filamento planejado"
   ProductionOrder ||--o{ PrintJob : "execuções"
   Printer ||--o{ PrintJob : "imprime"
   MaterialRoll ||--o{ PrintJob : "consome"
@@ -141,7 +141,8 @@ erDiagram
 - **`InventoryMovement`** é o livro-razão: tipo (`PURCHASE_IN`, `PRODUCTION_OUT`, `ADJUSTMENT`, `LOSS`, `WASTE`, `RETURN`, `PRODUCTION_IN`), quantidade, saldo resultante, responsável, data e referências opcionais (`printJobId`, `orderId`). Saldo negativo só com permissão `inventory:allow-negative`, registrado em `AuditLog`.
 - **`StockReservation`** liga produto acabado a item de pedido (regra 8). Cancelamento libera a reserva sem apagar histórico (regra 9).
 - **`PrintJob` é o histórico de impressão** — cada execução numa impressora (início, fim, rolo, gramas estimadas e reais, resultado, motivo de falha, gramas desperdiçadas, tempo perdido). Por isso **`PrintHistory` não será criada**: seria redundante.
-- **Baixa de material sem duplicidade:** a baixa ocorre apenas ao **finalizar** um `PrintJob`, dentro de uma transação, com restrição única (`printJobId`, `type`) em `InventoryMovement`. Repetir a finalização não gera segunda baixa.
+- **Baixa de material sem duplicidade:** a baixa ocorre apenas ao **finalizar** um `PrintJob`, dentro de uma transação, com índice único (`referenceType`, `referenceId`, `type`, rolo/item) em `InventoryMovement`. Repetir a finalização não gera segunda baixa.
+- **`ProductionOrderItem` não foi criada (decisão da Fase 4):** o escopo define a ordem com **um** produto, variação e quantidade. Um pedido com vários itens gera uma ordem por item (regra 3). A tabela de itens seria redundante.
 - **`Order`:** restrição única `(marketplaceId, externalCode)` impede importação duplicada (regra 10). Mudanças de status geram `OrderStatusHistory`.
 - **Financeiro:** proponho `FinancialCategory` (com `kind = INCOME | EXPENSE`) no lugar de `ExpenseCategory`, porque a regra 11 exige categoria também nas receitas. `FinancialTransaction` guarda valor bruto, taxas e líquido. `PricingConfiguration` guarda parâmetros (R$/kWh, consumo da impressora em W, custo-hora de máquina e de mão de obra, margem padrão); taxas de cada canal ficam em `Marketplace`.
 - **Padrões gerais:** IDs `uuid` (v7, ordenáveis por tempo), `createdAt`/`updatedAt` em todas as tabelas, `deletedAt` (exclusão lógica) em cadastros (produtos, materiais, impressoras, fornecedores). Usuários nunca são excluídos: são **desativados** (`isActive`), preservando autoria em auditoria e históricos. Movimentações e históricos nunca são apagados.
@@ -187,6 +188,21 @@ Login ──▶ access token JWT (15 min, só em memória) + cookie httpOnly com
 - **Arquivos de produto:** gravados em `UPLOAD_DIR` com nome gerado pelo sistema. A validação confere extensão, tamanho por tipo e assinatura real do conteúdo (ex.: um `.png` que não é PNG é recusado). O download exige login, sai como anexo (só imagens podem ser exibidas na tela) e o nome segue a RFC 6266. A primeira imagem vira capa.
 - **Integridade no banco** (SQL manual na migration, invisível para o Prisma e já conferido com `prisma migrate diff`): movimentação com exatamente um alvo e quantidade ≠ 0; ficha técnica com exatamente um componente; item acabado ⇔ variação; no máximo uma variação padrão por produto; combinação de atributos única por produto.
 
+### Impressoras e produção (implementado na Fase 4)
+
+- **Situação da impressora:** a situação cadastrada é `AVAILABLE`, `MAINTENANCE` ou `INACTIVE`. "Imprimindo" e "Pausada" não são gravadas: vêm da impressão em andamento, então não ficam dessincronizadas. Não dá para pôr em manutenção uma impressora que está imprimindo.
+- **Horas acumuladas** = horas iniciais (contador da máquina no cadastro) + soma do tempo efetivo das impressões finalizadas (sem as pausas).
+- **Ciclo da ordem:** `PENDING` (sem impressora) → `PLANNED` (com impressora) → `IN_PROGRESS`/`PAUSED` (impressão em andamento) → `COMPLETED` (tudo impresso) → `INSPECTION` (opcional) → `APPROVED`. Sem nenhuma peça aprovada e nada mais a imprimir: `FAILED`. Antes de imprimir: `CANCELLED` (estado acrescentado à lista do escopo, necessário para cancelar sem apagar histórico).
+- **Contadores da ordem:** planejadas, impressas, aprovadas, reprovadas e dispensadas. Falta imprimir = planejadas − dispensadas − (impressas − reprovadas). A próxima situação é calculada por uma função pura (`production-rules.ts`, com testes unitários).
+- **Dispensadas:** reprovadas sem refabricação, falhas sem refazer, ou o que faltava quando a produção foi encerrada antes do fim. Encerrar uma parte não cancela peças que ainda nem foram impressas.
+- **Uma impressão por vez:** índices únicos parciais garantem no máximo uma impressão em andamento por impressora e por ordem. O início trava a linha da impressora (`FOR UPDATE`).
+- **Baixa de filamento:** só ao finalizar, pelo peso real informado, um lançamento por rolo (troca de rolo ou multicor). Falha gera `WASTE`; sucesso gera `PRODUCTION_OUT`. A linha da impressão é travada e o índice único do livro-razão impede a segunda baixa (teste com 5 finalizações simultâneas: 1 aceita, 4 recusadas).
+- **Inspeção:** aprovadas geram `PRODUCTION_IN` no produto acabado e baixam os insumos da ficha técnica (caixa, etiqueta) na mesma transação. Sem insumo suficiente, nada é gravado (saldo negativo só com autorização administrativa auditada).
+- **Alertas** (sino): estoque, manutenção vencida ou prevista em até 7 dias, e ordens atrasadas, conforme as permissões de cada usuário.
+- **Bambu Lab A1:** controle manual. Nenhuma comunicação com a impressora é simulada (ver seção 6).
+- **Pedido de origem:** o vínculo entre ordem e pedido entra na Fase 5, junto com a tabela de pedidos.
+- **Custo de manutenção:** registrado na manutenção. O lançamento no financeiro entra na Fase 6.
+
 > **Atenção nas próximas migrations:** sempre revisar o SQL gerado. Os índices parciais e as restrições `CHECK` acima não estão no `schema.prisma`.
 
 ## 5. Cronograma técnico
@@ -196,8 +212,8 @@ Login ──▶ access token JWT (15 min, só em memória) + cookie httpOnly com
 | 1    | Fundação: monorepo, front/back, Postgres/Prisma, Docker, health check                               | **Concluída**        |
 | 2    | Identidade visual, login JWT + refresh, layout com sidebar, usuários, perfis, permissões, auditoria | **Concluída**        |
 | 3    | Produtos, categorias, variações, arquivos, ficha técnica, materiais, rolos, insumos, movimentações  | **Concluída**        |
-| 4    | Impressoras, manutenção, ordens de produção, fila, `PrintJob`, falhas, baixa de material            | Aguardando validação |
-| 5    | Marketplaces, pedidos, itens, status, reservas, geração de OPs, importação CSV                      | —                    |
+| 4    | Impressoras, manutenção, ordens de produção, fila, `PrintJob`, falhas, baixa de material            | **Concluída**        |
+| 5    | Marketplaces, pedidos, itens, status, reservas, geração de OPs, importação CSV                      | Aguardando validação |
 | 6    | Receitas, despesas, precificação, dashboard com dados reais, relatórios + CSV                       | —                    |
 | 7    | Testes E2E, ajustes, configuração de produção, backup, implantação                                  | —                    |
 

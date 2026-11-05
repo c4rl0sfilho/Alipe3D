@@ -102,7 +102,7 @@ export const MOVEMENT_DIRECTION: Record<MovementType, 1 | -1 | 0> = {
   RETURN_OUT: -1,
 };
 
-/** Tipos que o usuário registra manualmente. PRODUCTION_* ficam para o módulo de produção. */
+/** Tipos que o usuário registra manualmente. PRODUCTION_IN é exclusivo do módulo de produção. */
 export const MANUAL_MOVEMENT_TYPES = [
   'PURCHASE_IN',
   'PRODUCTION_OUT',
@@ -119,7 +119,8 @@ export type StockTargetKind = 'ROLL' | 'SUPPLY' | 'FINISHED_GOOD';
 /**
  * Movimentações manuais permitidas por tipo de item.
  * - Rolos entram no estoque pelo cadastro do rolo (que gera a entrada por compra).
- * - Produtos acabados entram pela produção (Fase 4); até lá, por ajuste manual.
+ * - Produtos acabados entram pela produção (inspeção aprovada). O ajuste manual cobre contagens
+ *   e estoque inicial.
  */
 export const ALLOWED_MOVEMENTS: Record<StockTargetKind, readonly ManualMovementType[]> = {
   ROLL: ['PRODUCTION_OUT', 'ADJUSTMENT', 'LOSS', 'WASTE', 'RETURN_IN', 'RETURN_OUT'],

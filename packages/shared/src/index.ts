@@ -9,3 +9,5 @@ export * from './schemas/roles.js';
 export * from './schemas/audit.js';
 export * from './schemas/catalog.js';
 export * from './schemas/inventory.js';
+export * from './schemas/production.js';
+export * from './schemas/alerts.js';

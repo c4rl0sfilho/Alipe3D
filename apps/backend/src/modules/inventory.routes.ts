@@ -76,10 +76,14 @@ export function materialsRoutes({ authenticate, materials }: InventoryRoutesDeps
   const router = Router();
   router.use(authenticate());
 
-  // A lista de filamentos também é usada na ficha técnica dos produtos
-  router.get('/', requireAnyPermission('inventory:read', 'products:read'), async (_req, res) => {
-    sendSuccess(res, await materials.list());
-  });
+  // A lista de filamentos também é usada na ficha técnica dos produtos e na produção
+  router.get(
+    '/',
+    requireAnyPermission('inventory:read', 'products:read', 'production:read'),
+    async (_req, res) => {
+      sendSuccess(res, await materials.list());
+    },
+  );
   router.post('/', canManage, async (req, res) => {
     const id = await materials.create(
       req.body as MaterialInput,
@@ -89,10 +93,15 @@ export function materialsRoutes({ authenticate, materials }: InventoryRoutesDeps
     sendSuccess(res, { id }, 201);
   });
 
-  router.get('/rolls', canRead, async (req, res) => {
-    const result = await materials.listRolls(req.query as ListRollsQuery);
-    sendSuccess(res, result.items, 200, result.meta);
-  });
+  // Os rolos também são escolhidos ao iniciar e finalizar impressões
+  router.get(
+    '/rolls',
+    requireAnyPermission('inventory:read', 'production:read'),
+    async (req, res) => {
+      const result = await materials.listRolls(req.query as ListRollsQuery);
+      sendSuccess(res, result.items, 200, result.meta);
+    },
+  );
   router.post('/rolls', canManage, async (req, res) => {
     sendSuccess(
       res,

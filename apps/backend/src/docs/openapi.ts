@@ -10,6 +10,7 @@ import {
 } from '@alipe3d/shared';
 import { z } from 'zod';
 import { catalogInventoryPaths, catalogInventoryTags } from './openapi-catalog-inventory.js';
+import { productionPaths, productionTags } from './openapi-production.js';
 
 /**
  * Documento OpenAPI 3.1 da API. Os corpos das requisições são gerados a partir dos mesmos
@@ -84,6 +85,7 @@ export function buildOpenApiDocument(version: string) {
       { name: 'Perfis', description: 'Perfis de acesso e permissões (administração)' },
       { name: 'Auditoria', description: 'Registro de operações (administração)' },
       ...catalogInventoryTags,
+      ...productionTags,
     ],
     paths: {
       '/health': {
@@ -308,6 +310,7 @@ export function buildOpenApiDocument(version: string) {
         },
       },
       ...catalogInventoryPaths,
+      ...productionPaths,
       '/audit-logs': {
         get: {
           tags: ['Auditoria'],

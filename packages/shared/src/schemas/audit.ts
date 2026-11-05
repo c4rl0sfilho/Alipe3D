@@ -42,6 +42,19 @@ export const AUDIT_ACTIONS = {
   'supply.deleted': 'Insumo excluído',
   'inventory.adjusted': 'Ajuste manual de estoque',
   'inventory.negative_authorized': 'Saldo negativo autorizado',
+  'printer.created': 'Impressora cadastrada',
+  'printer.updated': 'Impressora editada',
+  'printer.status_changed': 'Situação da impressora alterada',
+  'printer.deleted': 'Impressora excluída',
+  'maintenance.created': 'Manutenção registrada',
+  'maintenance.updated': 'Manutenção editada',
+  'maintenance.deleted': 'Manutenção excluída',
+  'production.created': 'Ordem de produção criada',
+  'production.updated': 'Ordem de produção editada',
+  'production.cancelled': 'Ordem de produção cancelada',
+  'production.closed_short': 'Ordem de produção encerrada sem refabricação',
+  'production.job_failed': 'Falha de impressão registrada',
+  'production.inspected': 'Inspeção de qualidade registrada',
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

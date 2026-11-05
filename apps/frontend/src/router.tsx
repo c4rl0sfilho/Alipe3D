@@ -46,6 +46,23 @@ const StockItemsPage = lazy(async () => ({
 }));
 const MovementsPage = page(() => import('@/modules/inventory/MovementsPage'), 'MovementsPage');
 const SuppliersPage = page(() => import('@/modules/inventory/SuppliersPage'), 'SuppliersPage');
+const ProductionLayout = page(
+  () => import('@/modules/production/ProductionLayout'),
+  'ProductionLayout',
+);
+const OrdersListPage = lazy(async () => ({
+  default: (await import('@/modules/production/OrdersListPage')).OrdersListPage,
+}));
+const PrintJobsPage = page(() => import('@/modules/production/PrintJobsPage'), 'PrintJobsPage');
+const ProductionOrderDetailPage = page(
+  () => import('@/modules/production/ProductionOrderDetailPage'),
+  'ProductionOrderDetailPage',
+);
+const PrintersPage = page(() => import('@/modules/printers/PrintersPage'), 'PrintersPage');
+const PrinterDetailPage = page(
+  () => import('@/modules/printers/PrinterDetailPage'),
+  'PrinterDetailPage',
+);
 const SystemStatusPage = page(
   () => import('@/modules/system/SystemStatusPage'),
   'SystemStatusPage',
@@ -100,6 +117,41 @@ export const router = createBrowserRouter([
               { path: 'produtos-acabados', element: <StockItemsPage kind="FINISHED_GOOD" /> },
               { path: 'movimentacoes', element: <MovementsPage /> },
               { path: 'fornecedores', element: <SuppliersPage /> },
+            ],
+          },
+          {
+            path: '/producao',
+            element: (
+              <RequirePermission permission="production:read">
+                <Outlet />
+              </RequirePermission>
+            ),
+            children: [
+              {
+                element: <ProductionLayout />,
+                children: [
+                  { index: true, element: <OrdersListPage key="queue" view="queue" /> },
+                  {
+                    path: 'inspecao',
+                    element: <OrdersListPage key="inspection" view="inspection" />,
+                  },
+                  { path: 'ordens', element: <OrdersListPage key="all" view="all" /> },
+                  { path: 'impressoes', element: <PrintJobsPage /> },
+                ],
+              },
+              { path: 'ordens/:id', element: <ProductionOrderDetailPage /> },
+            ],
+          },
+          {
+            path: '/impressoras',
+            element: (
+              <RequirePermission permission="printers:read">
+                <Outlet />
+              </RequirePermission>
+            ),
+            children: [
+              { index: true, element: <PrintersPage /> },
+              { path: ':id', element: <PrinterDetailPage /> },
             ],
           },
           {

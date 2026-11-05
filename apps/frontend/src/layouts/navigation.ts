@@ -55,14 +55,12 @@ export const NAVIGATION: NavSection[] = [
         to: '/producao',
         icon: Factory,
         permission: 'production:read',
-        plannedPhase: 4,
       },
       {
         label: 'Impressoras',
         to: '/impressoras',
         icon: Printer,
         permission: 'printers:read',
-        plannedPhase: 4,
       },
       {
         label: 'Pedidos',

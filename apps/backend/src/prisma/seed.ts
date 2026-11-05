@@ -2,6 +2,7 @@
  * Seed de dados ESSENCIAIS do sistema (não são dados de demonstração):
  *  - sincroniza o catálogo de permissões com o banco;
  *  - garante os perfis ADMIN e OPERACIONAL;
+ *  - cadastra as duas impressoras da empresa (ALIPE-PRINTER-01 e 02), se ainda não existirem;
  *  - cria o primeiro administrador, se ainda não existir nenhum, a partir de SEED_ADMIN_*.
  *
  * Idempotente: pode ser executado quantas vezes for preciso (npm run db:seed).
@@ -23,6 +24,9 @@ const rootEnv = resolve(import.meta.dirname, '../../../../.env');
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const log = (message: string) => console.warn(`[seed] ${message}`);
+
+/** As duas Bambu Lab A1 da Alipe3D (escopo do projeto, módulo Impressoras). */
+const INITIAL_PRINTERS = ['ALIPE-PRINTER-01', 'ALIPE-PRINTER-02'];
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -78,7 +82,17 @@ async function main() {
       log('Perfil Operacional criado com as permissões padrão.');
     }
 
-    // 3. Primeiro administrador
+    // 3. Impressoras da empresa (definidas no escopo do projeto). Criadas uma única vez:
+    //    depois disso são editadas ou excluídas pela tela, e o seed não as recria.
+    for (const code of INITIAL_PRINTERS) {
+      const exists = await prisma.printer.findUnique({ where: { code }, select: { id: true } });
+      if (!exists) {
+        await prisma.printer.create({ data: { code, model: 'Bambu Lab A1', status: 'AVAILABLE' } });
+        log(`Impressora ${code} cadastrada.`);
+      }
+    }
+
+    // 4. Primeiro administrador
     const adminCount = await prisma.user.count({ where: { role: { code: SYSTEM_ROLES.ADMIN } } });
     if (adminCount > 0) {
       log('Administrador já existe. Nenhum usuário criado.');

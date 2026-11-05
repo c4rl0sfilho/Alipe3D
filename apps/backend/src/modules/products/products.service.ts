@@ -1,5 +1,6 @@
 import {
   billOfMaterialsSchema,
+  CLOSED_STATUSES,
   listProductsQuerySchema,
   productInputSchema,
   variantInputSchema,
@@ -297,6 +298,7 @@ export class ProductsService {
         'Há estoque deste produto. Zere o estoque das variações antes de excluí-lo.',
       );
     }
+    await this.assertNoOpenProduction({ variant: { productId: id } });
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.product.update({ where: { id }, data: { deletedAt: now } });
@@ -408,6 +410,7 @@ export class ProductsService {
     if (variant.stockItem && !variant.stockItem.quantity.isZero()) {
       throw AppError.conflict('Há estoque desta variação. Zere o estoque antes de excluí-la.');
     }
+    await this.assertNoOpenProduction({ variantId });
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.productVariant.update({
@@ -562,6 +565,18 @@ export class ProductsService {
     const product = await this.prisma.product.findUnique({ where: { sku }, select: { id: true } });
     if (product && product.id !== ownProductId) {
       throw AppError.conflict(`O SKU ${sku} já está em uso (inclusive em produtos excluídos).`);
+    }
+  }
+
+  /** Ordens de produção abertas impedem a exclusão (o histórico precisa do produto). */
+  private async assertNoOpenProduction(where: Prisma.ProductionOrderWhereInput) {
+    const open = await this.prisma.productionOrder.count({
+      where: { ...where, status: { notIn: [...CLOSED_STATUSES] } },
+    });
+    if (open > 0) {
+      throw AppError.conflict(
+        `Há ${open} ordem(ns) de produção em aberto para este item. Conclua ou cancele-as antes.`,
+      );
     }
   }
 

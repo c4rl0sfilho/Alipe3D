@@ -50,6 +50,11 @@ export function extractRefreshCookie(header: string | string[] | undefined): str
 
 export async function resetDatabase() {
   // Ordem respeita as chaves estrangeiras (movimentações antes de itens e usuários)
+  await prisma.qualityInspection.deleteMany();
+  await prisma.printJob.deleteMany();
+  await prisma.productionOrder.deleteMany();
+  await prisma.printerMaintenance.deleteMany();
+  await prisma.printer.deleteMany();
   await prisma.inventoryMovement.deleteMany();
   await prisma.productMaterial.deleteMany();
   await prisma.productFile.deleteMany();

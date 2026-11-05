@@ -41,6 +41,12 @@ model User {
   auditLogs           AuditLog[]
   uploadedFiles       ProductFile[]
   movements           InventoryMovement[]  @relation("MovementUser")
+  maintenances        PrinterMaintenance[]
+  ordersResponsible   ProductionOrder[]    @relation("OrderResponsible")
+  ordersCreated       ProductionOrder[]    @relation("OrderCreator")
+  jobsStarted         PrintJob[]           @relation("JobStarter")
+  jobsFinished        PrintJob[]           @relation("JobFinisher")
+  inspections         QualityInspection[]
 
   @@index([roleId])
   @@index([isActive])
@@ -232,9 +238,10 @@ model ProductVariant {
   updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt             DateTime? @map("deleted_at") @db.Timestamptz(3)
 
-  product         Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
-  billOfMaterials ProductMaterial[]
-  stockItem       InventoryItem?
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  billOfMaterials  ProductMaterial[]
+  stockItem        InventoryItem?
+  productionOrders ProductionOrder[]
 
   @@index([productId])
   @@map("product_variants")
@@ -372,8 +379,9 @@ model Material {
   updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt     DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
-  rolls         MaterialRoll[]
-  productUsages ProductMaterial[]
+  rolls            MaterialRoll[]
+  productUsages    ProductMaterial[]
+  productionOrders ProductionOrder[]
 
   @@index([type])
   @@map("materials")
@@ -400,6 +408,7 @@ model MaterialRoll {
   material  Material            @relation(fields: [materialId], references: [id], onDelete: Restrict)
   supplier  Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   movements InventoryMovement[]
+  printJobs PrintJob[]
 
   @@index([materialId, status])
   @@map("material_rolls")
@@ -465,4 +474,216 @@ model InventoryMovement {
   @@index([occurredAt])
   @@index([referenceType, referenceId])
   @@map("inventory_movements")
+}
+
+// =====================================================================
+// Impressoras e manutenção (Fase 4)
+// =====================================================================
+
+/// Situação cadastrada. "Imprimindo"/"Pausada" vêm da impressão em andamento (PrintJob).
+enum PrinterStatus {
+  AVAILABLE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  CLEANING
+  CALIBRATION
+  PART_REPLACEMENT
+  FIRMWARE
+  OTHER
+}
+
+model Printer {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  /// Identificação da máquina (ex.: ALIPE-PRINTER-01).
+  code         String        @unique @db.VarChar(40)
+  name         String?       @db.VarChar(80)
+  model        String        @db.VarChar(80)
+  serialNumber String?       @map("serial_number") @db.VarChar(80)
+  acquiredAt   DateTime?     @map("acquired_at") @db.Date
+  /// Horas do contador da impressora no cadastro. O total soma as impressões registradas.
+  initialHours Decimal       @default(0) @map("initial_hours") @db.Decimal(10, 1)
+  status       PrinterStatus @default(AVAILABLE)
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  maintenances     PrinterMaintenance[]
+  productionOrders ProductionOrder[]
+  printJobs        PrintJob[]
+
+  @@map("printers")
+}
+
+model PrinterMaintenance {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  printerId         String          @map("printer_id") @db.Uuid
+  type              MaintenanceType
+  description       String          @db.VarChar(500)
+  performedAt       DateTime        @map("performed_at") @db.Date
+  /// Quem executou (pode ser alguém de fora do sistema, como um técnico).
+  responsibleName   String          @map("responsible_name") @db.VarChar(120)
+  partsReplaced     String?         @map("parts_replaced") @db.VarChar(500)
+  cost              Decimal         @default(0) @db.Decimal(12, 2)
+  nextMaintenanceAt DateTime?       @map("next_maintenance_at") @db.Date
+  createdById       String          @map("created_by_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  printer   Printer @relation(fields: [printerId], references: [id], onDelete: Restrict)
+  createdBy User    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([printerId, performedAt])
+  @@map("printer_maintenances")
+}
+
+// =====================================================================
+// Produção: ordens, impressões e inspeção (Fase 4)
+// =====================================================================
+
+enum ProductionStatus {
+  PENDING
+  PLANNED
+  IN_PROGRESS
+  PAUSED
+  FAILED
+  COMPLETED
+  INSPECTION
+  APPROVED
+  CANCELLED
+}
+
+/// A ordem de declaração define a ordenação (URGENT é a maior).
+enum ProductionPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PrintJobStatus {
+  IN_PROGRESS
+  PAUSED
+  SUCCEEDED
+  FAILED
+}
+
+enum FailureReason {
+  BED_ADHESION
+  NOZZLE_CLOG
+  FILAMENT_RUNOUT
+  FILAMENT_TANGLE
+  LAYER_SHIFT
+  WARPING
+  SPAGHETTI
+  POWER_OUTAGE
+  SLICING_ERROR
+  OPERATOR_CANCELLED
+  OTHER
+}
+
+/// Ordem de produção de UMA variação. Um pedido (Fase 5) gera uma ordem por item.
+model ProductionOrder {
+  id                   String             @id @default(uuid(7)) @db.Uuid
+  /// Código sequencial (OP-0001, OP-0002...).
+  code                 String             @unique @default(dbgenerated("('OP-'::text || lpad((nextval('production_order_code_seq'::regclass))::text, 4, '0'::text))")) @db.VarChar(20)
+  variantId            String             @map("variant_id") @db.Uuid
+  materialId           String?            @map("material_id") @db.Uuid
+  printerId            String?            @map("printer_id") @db.Uuid
+  quantity             Int
+  /// Peças saídas da impressora (somadas a cada impressão concluída).
+  producedQuantity     Int                @default(0) @map("produced_quantity")
+  approvedQuantity     Int                @default(0) @map("approved_quantity")
+  rejectedQuantity     Int                @default(0) @map("rejected_quantity")
+  /// Peças dispensadas: reprovadas sem refabricação, falhas sem refazer ou o que faltava ao encerrar.
+  waivedQuantity       Int                @default(0) @map("waived_quantity")
+  status               ProductionStatus   @default(PENDING)
+  priority             ProductionPriority @default(NORMAL)
+  dueDate              DateTime?          @map("due_date") @db.Date
+  estimatedMinutes     Int                @map("estimated_minutes")
+  estimatedWeightGrams Decimal            @map("estimated_weight_grams") @db.Decimal(10, 2)
+  notes                String?
+  cancelReason         String?            @map("cancel_reason") @db.VarChar(300)
+  responsibleId        String             @map("responsible_id") @db.Uuid
+  createdById          String             @map("created_by_id") @db.Uuid
+  /// Quando a ordem foi encerrada (aprovada, falhou ou cancelada).
+  closedAt             DateTime?          @map("closed_at") @db.Timestamptz(3)
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  variant     ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  material    Material?           @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  printer     Printer?            @relation(fields: [printerId], references: [id], onDelete: Restrict)
+  responsible User                @relation("OrderResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  createdBy   User                @relation("OrderCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  printJobs   PrintJob[]
+  inspections QualityInspection[]
+
+  @@index([status, priority])
+  @@index([printerId, status])
+  @@index([materialId])
+  @@index([variantId])
+  @@map("production_orders")
+}
+
+/// Cada execução numa impressora: é o histórico de impressão e de falhas.
+/// A baixa de filamento é feita ao finalizar, no livro-razão (referenceType = PRINT_JOB).
+model PrintJob {
+  id                String         @id @default(uuid(7)) @db.Uuid
+  productionOrderId String         @map("production_order_id") @db.Uuid
+  printerId         String         @map("printer_id") @db.Uuid
+  /// Rolo carregado no início da impressão.
+  rollId            String         @map("roll_id") @db.Uuid
+  status            PrintJobStatus @default(IN_PROGRESS)
+  plannedQuantity   Int            @map("planned_quantity")
+  producedQuantity  Int            @default(0) @map("produced_quantity")
+  estimatedGrams    Decimal        @map("estimated_grams") @db.Decimal(10, 2)
+  estimatedMinutes  Int            @map("estimated_minutes")
+  startedAt         DateTime       @map("started_at") @db.Timestamptz(3)
+  finishedAt        DateTime?      @map("finished_at") @db.Timestamptz(3)
+  pausedAt          DateTime?      @map("paused_at") @db.Timestamptz(3)
+  /// Tempo total em pausa, descontado das horas de máquina.
+  pausedSeconds     Int            @default(0) @map("paused_seconds")
+  failureReason     FailureReason? @map("failure_reason")
+  failureNotes      String?        @map("failure_notes") @db.VarChar(500)
+  lostMinutes       Int?           @map("lost_minutes")
+  needsReprint      Boolean        @default(false) @map("needs_reprint")
+  notes             String?        @db.VarChar(1000)
+  startedById       String         @map("started_by_id") @db.Uuid
+  finishedById      String?        @map("finished_by_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+  printer         Printer         @relation(fields: [printerId], references: [id], onDelete: Restrict)
+  roll            MaterialRoll    @relation(fields: [rollId], references: [id], onDelete: Restrict)
+  startedBy       User            @relation("JobStarter", fields: [startedById], references: [id], onDelete: Restrict)
+  finishedBy      User?           @relation("JobFinisher", fields: [finishedById], references: [id], onDelete: Restrict)
+
+  @@index([printerId, startedAt])
+  @@index([productionOrderId])
+  @@index([status])
+  @@map("print_jobs")
+}
+
+/// Inspeção das peças impressas. As aprovadas entram no estoque de produto acabado.
+model QualityInspection {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  productionOrderId String   @map("production_order_id") @db.Uuid
+  approvedQuantity  Int      @map("approved_quantity")
+  rejectedQuantity  Int      @map("rejected_quantity")
+  notes             String?
+  inspectedById     String   @map("inspected_by_id") @db.Uuid
+  inspectedAt       DateTime @default(now()) @map("inspected_at") @db.Timestamptz(3)
+
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Restrict)
+  inspectedBy     User            @relation(fields: [inspectedById], references: [id], onDelete: Restrict)
+
+  @@index([productionOrderId])
+  @@map("quality_inspections")
 }

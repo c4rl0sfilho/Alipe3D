@@ -3,18 +3,18 @@ import { AlertTriangle, Bell, OctagonAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { inventoryKeys, stockApi } from '@/modules/inventory/inventory.api';
+import { alertsApi, productionKeys } from '@/modules/production/production.api';
 import { cn } from '@/utils/cn';
 
-/** Notificações do cabeçalho: alertas reais de reposição de estoque. */
+/** Notificações do cabeçalho: estoque, manutenção de impressoras e ordens atrasadas. */
 export function AlertsBell() {
   const { can } = useAuth();
-  const enabled = can('inventory:read');
+  const enabled = can('inventory:read') || can('printers:read') || can('production:read');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const alerts = useQuery({
-    queryKey: inventoryKeys.alerts,
-    queryFn: stockApi.alerts,
+    queryKey: productionKeys.alerts,
+    queryFn: alertsApi.list,
     enabled,
     refetchInterval: 60_000,
   });
@@ -48,9 +48,7 @@ export function AlertsBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-lg p-2 text-ink-muted hover:bg-canvas hover:text-ink"
-        aria-label={
-          items.length ? `${items.length} alertas de estoque` : 'Nenhum alerta de estoque'
-        }
+        aria-label={items.length ? `${items.length} alertas` : 'Nenhum alerta'}
         aria-haspopup="true"
         aria-expanded={open}
       >
@@ -69,7 +67,7 @@ export function AlertsBell() {
 
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface shadow-lg">
-          <p className="border-b border-line px-4 py-3 text-sm font-semibold">Alertas de estoque</p>
+          <p className="border-b border-line px-4 py-3 text-sm font-semibold">Alertas</p>
           {items.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-ink-muted">
               Nenhum alerta no momento.
@@ -102,13 +100,11 @@ export function AlertsBell() {
               })}
             </ul>
           )}
-          <Link
-            to="/estoque"
-            onClick={() => setOpen(false)}
-            className="block border-t border-line px-4 py-2.5 text-center text-sm font-medium text-brand-700 hover:bg-canvas"
-          >
-            Ver estoque
-          </Link>
+          {items.length > 8 && (
+            <p className="border-t border-line px-4 py-2.5 text-center text-xs text-ink-muted">
+              Mais {items.length - 8} alerta(s) nas telas de estoque, produção e impressoras.
+            </p>
+          )}
         </div>
       )}
     </div>

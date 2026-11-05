@@ -5,6 +5,12 @@ import { authRoutes } from '../modules/auth/auth.routes.js';
 import { categoriesRoutes, productsRoutes } from '../modules/catalog.routes.js';
 import { inventoryRoutes, materialsRoutes, suppliersRoutes } from '../modules/inventory.routes.js';
 import { healthRoutes } from '../modules/health/health.routes.js';
+import {
+  alertsRoutes,
+  maintenanceRoutes,
+  printersRoutes,
+  productionRoutes,
+} from '../modules/production.routes.js';
 import { rolesRoutes } from '../modules/roles/roles.routes.js';
 import { usersRoutes } from '../modules/users/users.routes.js';
 
@@ -57,6 +63,19 @@ export function createV1Router({
   router.use('/suppliers', suppliersRoutes(inventory));
   router.use('/materials', materialsRoutes(inventory));
   router.use('/inventory', inventoryRoutes(inventory));
+
+  const production = {
+    authenticate,
+    printers: services.printers,
+    maintenance: services.maintenance,
+    orders: services.productionOrders,
+    jobs: services.printJobs,
+    alerts: services.alerts,
+  };
+  router.use('/printers', printersRoutes(production));
+  router.use('/maintenance', maintenanceRoutes(production));
+  router.use('/production', productionRoutes(production));
+  router.use('/alerts', alertsRoutes(production));
 
   return router;
 }

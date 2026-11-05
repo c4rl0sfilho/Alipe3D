@@ -91,3 +91,43 @@ const timeFormatter = new Intl.DateTimeFormat(LOCALE, { timeStyle: 'short', time
 export function formatTime(value: Date | string): string {
   return timeFormatter.format(new Date(value));
 }
+
+const localInputFormatter = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** Data e hora em São Paulo no formato do input datetime-local (AAAA-MM-DDTHH:mm). */
+export function toLocalInput(value: Date | string = new Date()): string {
+  return localInputFormatter.format(new Date(value)).replace(' ', 'T');
+}
+
+/** Valor do input datetime-local (horário de São Paulo, UTC−3) para ISO com fuso. */
+export function localInputToIso(value: string): string {
+  return `${value}:00-03:00`;
+}
+
+/** Horas de máquina: "1.234,5 h". */
+export function formatHours(value: number | string): string {
+  return `${formatNumber(value, 1)} h`;
+}
+
+/** Tempo decorrido desde `from` até `now`, descontando pausas (em segundos). */
+export function elapsedSeconds(from: string, now: number, pausedSeconds = 0): number {
+  return Math.max(0, (now - new Date(from).getTime()) / 1000 - pausedSeconds);
+}
+
+const dateTimeShortFormatter = new Intl.DateTimeFormat(LOCALE, {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: TIME_ZONE,
+});
+
+/** Data e hora sem segundos: "05/11/2026, 14:30". */
+export function formatDateTimeShort(value: Date | string): string {
+  return dateTimeShortFormatter.format(new Date(value));
+}

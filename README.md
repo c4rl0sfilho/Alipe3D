@@ -2,7 +2,7 @@
 
 Gestão operacional, comercial e financeira da Alipe3D: produtos, estoque, produção, impressoras, pedidos, financeiro e relatórios em uma única plataforma.
 
-> **Status:** Fases 1 (Fundação), 2 (Autenticação, usuários e permissões) e 3 (Produtos e estoque) concluídas. Planejamento, DER e cronograma em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+> **Status:** Fases 1 (Fundação), 2 (Autenticação, usuários e permissões), 3 (Produtos e estoque) e 4 (Impressoras e produção) concluídas. Planejamento, DER e cronograma em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Stack
 
@@ -57,11 +57,13 @@ O seed só cria o administrador se ainda não existir nenhum. Depois do primeiro
 
 ## Módulos disponíveis
 
-| Módulo            | O que já faz                                                                                                                                                                                                                                                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Produtos**      | Catálogo com SKU, categoria, preço, peso, tempo de impressão e estoque mínimo. Variações (cor, material, tamanho, modelo) com SKU e valores próprios. Ficha técnica por variação (gramas de filamento + insumos). Fotos, STL, 3MF, perfis de impressão e PDFs.                                                             |
-| **Estoque**       | Filamentos e rolos em gramas (código `R-0001` por carretel, custo por grama, conferência por pesagem). Insumos com custo médio. Produtos acabados por variação. Entradas, saídas, perdas, desperdícios, devoluções e ajustes, com histórico, responsável e saldo após cada lançamento. Fornecedores. Alertas de reposição. |
-| **Administração** | Usuários, perfis de acesso, permissões e auditoria.                                                                                                                                                                                                                                                                        |
+| Módulo            | O que já faz                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Produtos**      | Catálogo com SKU, categoria, preço, peso, tempo de impressão e estoque mínimo. Variações (cor, material, tamanho, modelo) com SKU e valores próprios. Ficha técnica por variação (gramas de filamento + insumos). Fotos, STL, 3MF, perfis de impressão e PDFs.                                                                                                                                                                            |
+| **Estoque**       | Filamentos e rolos em gramas (código `R-0001` por carretel, custo por grama, conferência por pesagem). Insumos com custo médio. Produtos acabados por variação. Entradas, saídas, perdas, desperdícios, devoluções e ajustes, com histórico, responsável e saldo após cada lançamento. Fornecedores. Alertas de reposição.                                                                                                                |
+| **Produção**      | Ordens de produção (OP-0001…) com produto, variação, quantidade, filamento, impressora, prazo, prioridade e responsável. Fila por prioridade e prazo, com filtros e agrupamento por filamento. Impressões com início, pausa e finalização: baixa do peso real de cada rolo uma única vez. Falhas com motivo, desperdício, tempo perdido e refabricação. Inspeção: peças aprovadas entram no estoque e baixam os insumos da ficha técnica. |
+| **Impressoras**   | ALIPE-PRINTER-01 e 02 (Bambu Lab A1) cadastradas pelo seed. Situação ao vivo (disponível, imprimindo, pausada, manutenção, inativa), horas acumuladas, histórico de impressões, falhas e manutenções, com alerta da próxima manutenção. Controle manual: nenhuma comunicação com a impressora é simulada.                                                                                                                                 |
+| **Administração** | Usuários, perfis de acesso, permissões e auditoria.                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ### Primeiros passos sugeridos
 
@@ -71,6 +73,15 @@ O seed só cria o administrador se ainda não existir nenhum. Depois do primeiro
 4. **Estoque → Insumos:** cadastre embalagens e etiquetas e lance a quantidade com **Entrada por compra**.
 5. **Produtos:** cadastre os produtos, as variações e a ficha técnica.
 6. **Estoque → Produtos acabados:** lance o que já está pronto com **Ajuste manual** (motivo: contagem inicial).
+7. **Impressoras:** confira as duas A1, informe as horas já impressas (contador da impressora) e registre a última manutenção.
+8. **Produção → Nova ordem:** escolha produto, quantidade e prazo. Peso, tempo e filamento vêm da ficha técnica.
+
+### Fluxo da produção
+
+1. **Iniciar impressão:** escolha a impressora e o rolo carregado. A impressora fica ocupada; nada é baixado ainda.
+2. **Finalizar impressão:** informe o peso real consumido (de um ou mais rolos) e as peças produzidas. O filamento sai do estoque nesse momento, uma única vez, mesmo que o botão seja clicado de novo.
+3. **Registrar falha** (no lugar de finalizar): motivo, filamento desperdiçado, tempo perdido e se as peças serão refeitas.
+4. **Inspeção:** as peças aprovadas entram no estoque de produto acabado e os insumos da ficha técnica (caixa, etiqueta) são baixados. Reprovadas podem voltar para a fila.
 
 Para conferir um rolo, use o botão de balança: informe o peso do rolo com o carretel e o sistema calcula o filamento restante e corrige o saldo.
 

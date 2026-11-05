@@ -15,6 +15,11 @@ import { MaterialsService } from './modules/materials/materials.service.js';
 import { ProductFilesService } from './modules/products/product-files.service.js';
 import { ProductsService } from './modules/products/products.service.js';
 import { SuppliersService } from './modules/suppliers/suppliers.service.js';
+import { AlertsService } from './modules/alerts/alerts.service.js';
+import { MaintenanceService } from './modules/printers/maintenance.service.js';
+import { PrintersService } from './modules/printers/printers.service.js';
+import { PrintJobsService } from './modules/production/print-jobs.service.js';
+import { ProductionOrdersService } from './modules/production/production-orders.service.js';
 import { FileStorage } from './services/file-storage.js';
 import { createMailer, type Mailer } from './services/mailer.js';
 import { PasswordHasher } from './utils/password.js';
@@ -52,6 +57,11 @@ export interface AppServices {
   materials: MaterialsService;
   stockItems: StockItemsService;
   movements: MovementsService;
+  printers: PrintersService;
+  maintenance: MaintenanceService;
+  productionOrders: ProductionOrdersService;
+  printJobs: PrintJobsService;
+  alerts: AlertsService;
 }
 
 export interface CreateServicesOptions {
@@ -88,6 +98,9 @@ export function createServices({
   const products = new ProductsService(prisma, audit);
   const movements = new MovementsService(prisma, audit);
   const materials = new MaterialsService(prisma, audit, movements);
+  const stockItems = new StockItemsService(prisma, audit, materials);
+  const printers = new PrintersService(prisma, audit);
+  const printJobs = new PrintJobsService(prisma, audit, movements);
 
   return {
     health: new HealthService({
@@ -111,7 +124,12 @@ export function createServices({
     productFiles: new ProductFilesService(prisma, storage, products, audit),
     suppliers: new SuppliersService(prisma, audit),
     materials,
-    stockItems: new StockItemsService(prisma, audit, materials),
+    stockItems,
     movements,
+    printers,
+    maintenance: new MaintenanceService(prisma, audit, printers),
+    productionOrders: new ProductionOrdersService(prisma, audit, movements, printJobs),
+    printJobs,
+    alerts: new AlertsService(prisma, stockItems, printers),
   };
 }

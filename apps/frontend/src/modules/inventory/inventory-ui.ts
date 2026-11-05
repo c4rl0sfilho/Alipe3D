@@ -35,5 +35,6 @@ export function useInvalidateStock() {
     await queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
     await queryClient.invalidateQueries({ queryKey: ['products'] });
     await queryClient.invalidateQueries({ queryKey: ['product'] });
+    await queryClient.invalidateQueries({ queryKey: ['alerts'] });
   };
 }
